@@ -3,6 +3,38 @@ use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
+pub struct Emote {
+    pub name: String,
+    pub url: String,
+}
+
+impl Emote {
+    pub fn to_action(&self, prefix: &str, include_label: bool) -> Action {
+        let mut state = State::default();
+
+        if include_label {
+            state.title = self.name.clone();
+        }
+
+        let mut name = self.name.clone();
+        if !prefix.is_empty() && !name.is_empty() {
+            if let Some(c) = name.get_mut(0..1) {
+                c.make_ascii_uppercase();
+            }
+        }
+
+        Action {
+            name: "Text".into(),
+            state: 0,
+            states: vec![state],
+            settings: Settings::Text {
+                is_sending_enter: false,
+                pasted_text: format!(":_{}{}:", prefix, name),
+            },
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Profile {
@@ -51,7 +83,7 @@ pub struct Action {
     pub settings: Settings,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(tag = "UUID", content = "Settings", rename_all = "PascalCase")]
 pub enum Settings {
     #[serde(rename = "com.elgato.streamdeck.profile.backtoparent")]
@@ -231,6 +263,50 @@ mod tests {
         });
 
         assert_eq!(json, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn emote_to_action_with_prefix() -> Result<()> {
+        let emote = Emote {
+            url: "http://example.com/image.png".into(),
+            name: "small9cm".into(),
+        };
+
+        let action = emote.to_action("pomu", true);
+
+        assert_eq!(action.states[0].title, "small9cm");
+
+        match action.settings {
+            Settings::Text { pasted_text, .. } if pasted_text == ":_pomuSmall9cm:" => {}
+            _ => anyhow::bail!(
+                "Failed to find expected text in settings: {:?}",
+                action.settings
+            ),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn emote_to_action_no_prefix() -> Result<()> {
+        let emote = Emote {
+            url: "http://example.com/image.png".into(),
+            name: "hic1".into(),
+        };
+
+        let action = emote.to_action("", false);
+
+        assert_eq!(action.states[0].title, "");
+
+        match action.settings {
+            Settings::Text { pasted_text, .. } if pasted_text == ":_hic1:" => {}
+            _ => anyhow::bail!(
+                "Failed to find expected text in settings: {:?}",
+                action.settings
+            ),
+        }
 
         Ok(())
     }
