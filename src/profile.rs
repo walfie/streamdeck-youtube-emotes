@@ -7,6 +7,11 @@ use uuid::Uuid;
 #[serde(rename_all = "PascalCase")]
 pub struct Profile {
     pub actions: HashMap<Position, Action>,
+    pub device_model: String,
+    #[serde(rename = "DeviceUUID")]
+    pub device_uuid: String,
+    pub name: String,
+    pub version: String,
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -53,7 +58,7 @@ pub enum Settings {
     BackToParent {},
     #[serde(rename = "com.elgato.streamdeck.profile.openchild")]
     OpenChild {
-        #[serde(rename = "ProfileUUID")]
+        #[serde(rename = "ProfileUUID", serialize_with = "uuid_uppercase")]
         profile_uuid: Uuid,
     },
     #[serde(rename = "com.elgato.streamdeck.system.text", rename_all = "camelCase")]
@@ -61,6 +66,13 @@ pub enum Settings {
         is_sending_enter: bool,
         pasted_text: String,
     },
+}
+
+fn uuid_uppercase<S>(uuid: &Uuid, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&uuid.to_string().to_uppercase())
 }
 
 #[derive(Serialize)]
@@ -125,7 +137,7 @@ mod tests {
             },
         );
 
-        let child_uuid = Uuid::new_v4();
+        let profile_uuid = Uuid::parse_str("AC20BCF3-0A7C-4243-BB74-5C0DC5681BA5")?;
 
         actions.insert(
             Position::new(4, 2),
@@ -133,13 +145,17 @@ mod tests {
                 name: "Create Folder".into(),
                 state: 0,
                 states: vec![State::default()],
-                settings: Settings::OpenChild {
-                    profile_uuid: child_uuid.clone(),
-                },
+                settings: Settings::OpenChild { profile_uuid },
             },
         );
 
-        let profile = Profile { actions };
+        let profile = Profile {
+            actions,
+            device_model: "20GBA9901".into(),
+            device_uuid: "@(1)[4057/128/DL16K1A71331]".into(),
+            name: "Emotes".into(),
+            version: "1.0".into(),
+        };
 
         let json = serde_json::to_value(&profile)?;
 
@@ -204,10 +220,14 @@ mod tests {
               "Name": "Create Folder",
               "UUID": "com.elgato.streamdeck.profile.openchild",
               "Settings": {
-                "ProfileUUID": child_uuid
+                "ProfileUUID": "AC20BCF3-0A7C-4243-BB74-5C0DC5681BA5"
               }
             }
-          }
+          },
+          "DeviceModel": "20GBA9901",
+          "DeviceUUID": "@(1)[4057/128/DL16K1A71331]",
+          "Name": "Emotes",
+          "Version": "1.0"
         });
 
         assert_eq!(json, expected);
