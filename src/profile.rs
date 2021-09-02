@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
+#[derive(Debug)]
 pub struct Emote {
     pub name: String,
     pub url: String,

@@ -1,4 +1,5 @@
 mod profile;
+mod youtube;
 
 use anyhow::Result;
 use structopt::StructOpt;
