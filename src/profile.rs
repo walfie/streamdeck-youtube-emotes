@@ -38,7 +38,7 @@ impl Emote {
 
 #[derive(Serialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct Profile {
+pub struct ProfileManifest {
     pub actions: HashMap<Position, Action>,
     pub device_model: DeviceModel,
     #[serde(rename = "DeviceUUID")]
@@ -79,7 +79,7 @@ impl Serialize for DeviceModel {
     }
 }
 
-impl Profile {
+impl ProfileManifest {
     pub fn set_actions(&mut self, actions: Vec<Option<Action>>) {
         let (width, height) = self.device_model.size();
 
@@ -231,7 +231,7 @@ mod tests {
             },
         );
 
-        let profile = Profile {
+        let profile = ProfileManifest {
             actions,
             device_model: DeviceModel::Standard,
             device_uuid: "@(1)[4057/128/DL16K1A71331]".into(),
