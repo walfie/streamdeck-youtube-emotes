@@ -40,11 +40,60 @@ impl Emote {
 #[serde(rename_all = "PascalCase")]
 pub struct Profile {
     pub actions: HashMap<Position, Action>,
-    pub device_model: String,
+    pub device_model: DeviceModel,
     #[serde(rename = "DeviceUUID")]
-    pub device_uuid: String,
+    pub device_uuid: String, // e.g., `@(1)[4057/128/DL16K1A70561]`
     pub name: String,
-    pub version: String,
+    pub version: String, // `1.0`
+}
+
+pub enum DeviceModel {
+    Standard,
+    XL,
+    Mini,
+}
+
+impl DeviceModel {
+    pub fn id(&self) -> &'static str {
+        match self {
+            Self::Standard => "20GBA9901",
+            Self::XL => "20GAT9901",
+            Self::Mini => "unknown", // TODO: Find correct value
+        }
+    }
+
+    pub fn size(&self) -> (u8, u8) {
+        match self {
+            Self::Standard => (5, 3),
+            Self::XL => (4, 8),
+            Self::Mini => (3, 2),
+        }
+    }
+}
+impl Serialize for DeviceModel {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.id())
+    }
+}
+
+impl Profile {
+    pub fn set_actions(&mut self, actions: Vec<Option<Action>>) {
+        let (width, height) = self.device_model.size();
+
+        for (index, action) in actions.into_iter().enumerate() {
+            let index = index as u8;
+            let pos = Position::new(index % width, index / height);
+
+            if let Some(action) = action {
+                self.actions.insert(pos, action);
+            } else {
+                self.actions.remove(&pos);
+            }
+        }
+    }
 }
 
 #[derive(Eq, PartialEq, Hash)]
@@ -54,7 +103,7 @@ pub struct Position {
 }
 
 impl Position {
-    fn new(x: u8, y: u8) -> Self {
+    pub fn new(x: u8, y: u8) -> Self {
         Self { x, y }
     }
 }
@@ -184,7 +233,7 @@ mod tests {
 
         let profile = Profile {
             actions,
-            device_model: "20GBA9901".into(),
+            device_model: DeviceModel::Standard,
             device_uuid: "@(1)[4057/128/DL16K1A71331]".into(),
             name: "Emotes".into(),
             version: "1.0".into(),
