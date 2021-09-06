@@ -5,32 +5,34 @@ use crate::profile::{DeviceModel, ProfilesWithImages};
 use anyhow::{Context, Result};
 use std::fs;
 use std::io::Read;
-use std::path::Path;
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let device_uuid = "".to_owned();
-    let emote_prefix = "pomu";
-    let profile_name = "Pomu".to_owned();
-    let out_path = Path::new("./out");
+    let args = Args::from_args();
 
-    // TODO: Read from file (use `-` for stdin)
-    let mut html = String::new();
-    std::io::stdin().read_to_string(&mut html)?;
+    let html = if args.file.to_str() == Some("-") {
+        let mut buf = String::new();
+        std::io::stdin().read_to_string(&mut buf)?;
+        buf
+    } else {
+        fs::read_to_string(&args.file)
+            .with_context(|| format!("Failed to read file {:?}", &args.file))?
+    };
     let emotes = youtube::parse_emotes(&html)?;
 
     let profiles = ProfilesWithImages::new(
         DeviceModel::Standard,
-        device_uuid.into(),
-        profile_name,
+        args.device_uuid,
+        args.name,
         emotes,
-        emote_prefix,
-        true,
+        &args.prefix,
+        args.include_labels,
     )
     .await?;
 
-    let mut current_path = out_path.to_path_buf();
+    let mut current_path = args.out.to_path_buf();
     let mut is_root = true;
     for (uuid, manifest) in profiles.manifests {
         if is_root {
@@ -69,4 +71,17 @@ async fn main() -> Result<()> {
 }
 
 #[derive(StructOpt)]
-struct Args {}
+struct Args {
+    #[structopt(parse(from_os_str))]
+    file: PathBuf,
+    #[structopt(default_value = "", long)]
+    prefix: String,
+    #[structopt(long)]
+    name: String,
+    #[structopt(default_value = "", long)]
+    device_uuid: String,
+    #[structopt(long)]
+    include_labels: bool,
+    #[structopt(long)]
+    out: PathBuf,
+}
