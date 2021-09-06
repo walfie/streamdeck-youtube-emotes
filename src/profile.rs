@@ -4,6 +4,7 @@ use color_eyre::eyre::{Result, WrapErr};
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
+use std::str::FromStr;
 use tracing::info;
 use uuid::Uuid;
 
@@ -186,6 +187,19 @@ pub enum DeviceModel {
     Standard,
     XL,
     Mini,
+}
+
+impl FromStr for DeviceModel {
+    type Err = color_eyre::eyre::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_ref() {
+            "standard" => Ok(DeviceModel::Standard),
+            "xl" => Ok(DeviceModel::XL),
+            "mini" => Ok(DeviceModel::Mini),
+            other => bail!("Unknown device model {}", other),
+        }
+    }
 }
 
 impl DeviceModel {

@@ -7,14 +7,18 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tracing::info;
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
     tracing_subscriber::fmt::fmt().init();
 
-    let args = Args::from_args();
+    let mut args = Args::from_args();
+    if let Some(prefix) = args.prefix.strip_prefix('_') {
+        warn!(%prefix, "Ignoring leading underscore in prefix");
+        args.prefix = prefix.to_owned();
+    }
 
     let html = if args.file.to_str() == Some("-") {
         let mut buf = String::new();
@@ -27,7 +31,7 @@ async fn main() -> Result<()> {
     let emotes = youtube::parse_emotes(&html)?;
 
     let profiles = ProfilesWithImages::new(
-        DeviceModel::Standard,
+        args.model,
         args.device_uuid,
         args.name,
         emotes,
@@ -77,16 +81,36 @@ async fn main() -> Result<()> {
 
 #[derive(StructOpt)]
 struct Args {
+    /// Path to an HTML file containing the "join" (memberships) page for a channel.
+    /// E.g., Download the following page in a browser while logged in:
+    /// https://www.youtube.com/channel/UCP4nMSTdwU1KqYWu3UH5DHQ/join
+    ///
+    /// Use - to read from stdin.
     #[structopt(parse(from_os_str))]
     file: PathBuf,
+
+    /// The emote prefix (also known as "family name"). For example, if the channel has an emote
+    /// `:_pomuSmall9cm:`, the emote prefix would be `pomu`.
     #[structopt(default_value = "", long)]
     prefix: String,
+
+    /// Name of the Stream Deck profile
     #[structopt(long)]
     name: String,
+
+    /// Device UUID for the Stream Deck
     #[structopt(default_value = "", long)]
     device_uuid: String,
+
+    /// Whether to include the name of the emote on each key
     #[structopt(long)]
     include_labels: bool,
+
+    /// Output path to save the profile to
     #[structopt(long)]
     out: PathBuf,
+
+    /// The Stream Deck model to generate the profile for
+    #[structopt(long, possible_values = &["standard", "xl", "mini"])]
+    model: DeviceModel,
 }
