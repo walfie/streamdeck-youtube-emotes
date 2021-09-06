@@ -20,6 +20,14 @@ pub struct EmoteImage {
     pub bytes: Bytes,
 }
 
+pub fn uuid_v5(name: &str, page: usize) -> Uuid {
+    let url = format!(
+        "https://github.com/walfie/streamdeck-youtube-emotes#{}_page{}",
+        name, page,
+    );
+    Uuid::new_v5(&Uuid::NAMESPACE_URL, url.as_bytes())
+}
+
 impl Emote {
     pub fn to_action(&self, prefix: &str, include_label: bool, image: Option<Bytes>) -> Action {
         let mut state = State::new_image();
@@ -54,6 +62,7 @@ pub struct ProfilesWithImages {
 
 impl ProfilesWithImages {
     pub async fn new(
+        root_profile_uuid: Uuid,
         model: DeviceModel,
         device_uuid: String,
         name: String,
@@ -92,9 +101,18 @@ impl ProfilesWithImages {
 
         let mut manifests = Vec::new();
         let mut manifest_actions: Vec<Option<Action>> = Vec::new();
+        let mut page: usize = 0;
 
         for image in images.into_iter() {
             if manifest_actions.len() >= max_len {
+                let manifest_uuid = if page == 0 {
+                    root_profile_uuid
+                } else {
+                    uuid_v5(&name, page)
+                };
+
+                page += 1;
+
                 let mut manifest = ProfileManifest {
                     actions: HashMap::new(),
                     device_model: model.clone(),
@@ -105,7 +123,7 @@ impl ProfilesWithImages {
 
                 manifest.set_actions(std::mem::take(&mut manifest_actions));
 
-                manifests.push((Uuid::new_v4(), manifest));
+                manifests.push((manifest_uuid, manifest));
             }
 
             if manifest_actions.len() % (width as usize) == 0 {
@@ -129,7 +147,13 @@ impl ProfilesWithImages {
 
         manifest.set_actions(std::mem::take(&mut manifest_actions));
 
-        manifests.push((Uuid::new_v4(), manifest));
+        let manifest_uuid = if page == 0 {
+            root_profile_uuid
+        } else {
+            uuid_v5(&name, page)
+        };
+
+        manifests.push((manifest_uuid, manifest));
 
         for (_, manifest) in manifests.iter_mut().skip(1) {
             let action = Action {

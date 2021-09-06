@@ -2,12 +2,13 @@ mod profile;
 mod youtube;
 
 use crate::profile::{DeviceModel, ProfilesWithImages};
-use color_eyre::eyre::{Result, WrapErr};
+use color_eyre::eyre::{bail, Result, WrapErr};
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,6 +21,30 @@ async fn main() -> Result<()> {
         args.prefix = prefix.to_owned();
     }
 
+    // Find output path based on platform
+    let root_path = if let Some(ref path) = args.out {
+        path.clone()
+    } else if let Some(home) = dirs::home_dir() {
+        if cfg!(target_os = "macos") {
+            home.join("Library")
+                .join("Application Support")
+                .join("com.elgato.StreamDeck")
+                .join("ProfilesV2")
+                .to_path_buf()
+        } else if !cfg!(target_os = "windows") {
+            home.join("%AppData%")
+                .join("Roaming")
+                .join("StreamDeck")
+                .join("ProfilesV2")
+                .to_path_buf()
+        } else {
+            bail!("No output path specified")
+        }
+    } else {
+        bail!("Could not find home directory")
+    };
+
+    // Parse HTML file to get list of emotes
     let html = if args.file.to_str() == Some("-") {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
@@ -28,9 +53,13 @@ async fn main() -> Result<()> {
         fs::read_to_string(&args.file)
             .with_context(|| format!("Failed to read file {:?}", &args.file))?
     };
+
     let emotes = youtube::parse_emotes(&html)?;
 
+    // Generate profiles
     let profiles = ProfilesWithImages::new(
+        args.profile_uuid
+            .unwrap_or_else(|| profile::uuid_v5(&args.name, 0)),
         args.model,
         args.device_uuid,
         args.name,
@@ -40,7 +69,8 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    let mut current_path = args.out.to_path_buf();
+    // Write profiles to filesystem
+    let mut current_path = root_path;
     let mut is_root = true;
     for (uuid, manifest) in profiles.manifests {
         if is_root {
@@ -94,7 +124,8 @@ struct Args {
     #[structopt(default_value = "", long)]
     prefix: String,
 
-    /// Name of the Stream Deck profile
+    /// Name of the Stream Deck profile. Note that if the `profile-uuid` argument is unspecified, this name will
+    /// be used to determine the name of the output profile directory.
     #[structopt(long)]
     name: String,
 
@@ -102,13 +133,18 @@ struct Args {
     #[structopt(default_value = "", long)]
     device_uuid: String,
 
+    /// Override the UUID for the profile
+    #[structopt(long)]
+    profile_uuid: Option<Uuid>,
+
     /// Whether to include the name of the emote on each key
     #[structopt(long)]
     include_labels: bool,
 
-    /// Output path to save the profile to
+    /// Output path to save the profile to. If unspecified, profiles will be saved to the default
+    /// Stream Deck profile location (depending on platform).
     #[structopt(long)]
-    out: PathBuf,
+    out: Option<PathBuf>,
 
     /// The Stream Deck model to generate the profile for
     #[structopt(long, possible_values = &["standard", "xl", "mini"])]
