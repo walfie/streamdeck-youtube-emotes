@@ -159,9 +159,12 @@ impl ProfilesWithImages {
             let action = Action {
                 name: "Open Folder".into(),
                 state: 0,
-                states: vec![State::default()],
+                states: vec![State {
+                    title: "Back".into(),
+                    ..State::new_image()
+                }],
                 settings: Settings::BackToParent {},
-                image: None,
+                image: Some(include_bytes!("../images/back.png").as_ref().into()),
             };
 
             manifest.actions.insert(Position::new(0, 0), action);
@@ -175,12 +178,12 @@ impl ProfilesWithImages {
                     state: 0,
                     states: vec![State {
                         title: "Next".into(),
-                        ..State::default()
+                        ..State::new_image()
                     }],
                     settings: Settings::OpenChild {
                         profile_uuid: child.clone(),
                     },
-                    image: None,
+                    image: Some(include_bytes!("../images/forward.png").as_ref().into()),
                 };
 
                 manifest
