@@ -4,6 +4,7 @@ use color_eyre::eyre::{Result, WrapErr};
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -60,6 +61,7 @@ impl ProfilesWithImages {
         include_label: bool,
     ) -> Result<Self> {
         let image_futures = emotes.into_iter().map(|emote| async move {
+            info!(name = %emote.name, url = %emote.url, "Downloading image");
             let resp = reqwest::get(&emote.url)
                 .await
                 .with_context(|| format!("Failed to call URL {}", emote.url))?;

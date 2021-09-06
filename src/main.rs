@@ -7,10 +7,12 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
+    tracing_subscriber::fmt::fmt().init();
 
     let args = Args::from_args();
 
@@ -45,6 +47,7 @@ async fn main() -> Result<()> {
         }
 
         current_path.push(format!("{}.sdProfile", uuid.to_string().to_uppercase()));
+        info!(path = ?current_path, "Creating profile directory");
 
         fs::create_dir_all(&current_path)
             .with_context(|| format!("Failed to create path {:?}", &current_path))?;
