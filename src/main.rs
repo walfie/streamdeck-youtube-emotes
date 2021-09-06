@@ -26,18 +26,13 @@ async fn main() -> Result<()> {
         profile_name,
         emotes,
         emote_prefix,
-        true, // TODO: Fix this to true
+        true,
     )
     .await?;
 
-    let ProfilesWithImages {
-        manifests,
-        images_by_name,
-    } = profiles;
-
     let mut current_path = out_path.to_path_buf();
     let mut is_root = true;
-    for (uuid, manifest) in manifests {
+    for (uuid, manifest) in profiles.manifests {
         if is_root {
             is_root = false;
         } else {
@@ -62,13 +57,10 @@ async fn main() -> Result<()> {
             fs::create_dir_all(&img_path)
                 .with_context(|| format!("Failed to create path {:?}", &img_path))?;
 
-            if let Some(state) = action.states.first() {
-                let label = &state.title;
-                if let Some(bytes) = images_by_name.get(label) {
-                    let img_file_path = img_path.join("state0.png");
-                    fs::write(&img_file_path, bytes)
-                        .with_context(|| format!("Failed to write image {:?}", &img_file_path))?;
-                }
+            let img_file_path = img_path.join("state0.png");
+            if let Some(bytes) = &action.image {
+                fs::write(&img_file_path, bytes)
+                    .with_context(|| format!("Failed to write image {:?}", &img_file_path))?;
             }
         }
     }

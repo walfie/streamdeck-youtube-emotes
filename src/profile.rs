@@ -18,10 +18,9 @@ pub struct EmoteImage {
 }
 
 impl Emote {
-    pub fn to_action(&self, prefix: &str, include_label: bool) -> Action {
+    pub fn to_action(&self, prefix: &str, include_label: bool, image: Option<Bytes>) -> Action {
         let mut state = State::new_image();
 
-        // TODO: Make this always true
         if include_label {
             state.title = self.name.clone();
         }
@@ -37,6 +36,7 @@ impl Emote {
             name: "Text".into(),
             state: 0,
             states: vec![state],
+            image,
             settings: Settings::Text {
                 is_sending_enter: false,
                 pasted_text: format!(":_{}{}:", prefix, name),
@@ -46,7 +46,6 @@ impl Emote {
 }
 
 pub struct ProfilesWithImages {
-    pub images_by_name: HashMap<String, Bytes>,
     pub manifests: Vec<(Uuid, ProfileManifest)>,
 }
 
@@ -90,7 +89,6 @@ impl ProfilesWithImages {
         let mut manifests = Vec::new();
         let mut manifest_actions: Vec<Option<Action>> = Vec::new();
 
-        let mut images_by_name = HashMap::new();
         for image in images.into_iter() {
             if manifest_actions.len() >= max_len {
                 let mut manifest = ProfileManifest {
@@ -110,9 +108,11 @@ impl ProfilesWithImages {
                 manifest_actions.push(None);
             }
 
-            manifest_actions.push(Some(image.emote.to_action(prefix, include_label)));
-
-            images_by_name.insert(image.emote.name.clone(), image.bytes);
+            manifest_actions.push(Some(image.emote.to_action(
+                prefix,
+                include_label,
+                Some(image.bytes.clone()),
+            )));
         }
 
         let mut manifest = ProfileManifest {
@@ -133,6 +133,7 @@ impl ProfilesWithImages {
                 state: 0,
                 states: vec![State::default()],
                 settings: Settings::BackToParent {},
+                image: None,
             };
 
             manifest.actions.insert(Position::new(0, 0), action);
@@ -151,6 +152,7 @@ impl ProfilesWithImages {
                     settings: Settings::OpenChild {
                         profile_uuid: child.clone(),
                     },
+                    image: None,
                 };
 
                 manifest
@@ -161,10 +163,7 @@ impl ProfilesWithImages {
             }
         }
 
-        Ok(Self {
-            images_by_name,
-            manifests,
-        })
+        Ok(Self { manifests })
     }
 }
 
@@ -264,6 +263,8 @@ pub struct Action {
     pub name: String,
     #[serde(flatten)]
     pub settings: Settings,
+    #[serde(skip_serializing)]
+    pub image: Option<Bytes>,
 }
 
 #[derive(Serialize, Debug)]
@@ -345,6 +346,7 @@ mod tests {
                 state: 0,
                 states: vec![State::default()],
                 settings: Settings::BackToParent {},
+                image: None,
             },
         );
 
@@ -354,6 +356,7 @@ mod tests {
                 name: "Text".into(),
                 state: 0,
                 states: vec![State::new_image()],
+                image: None,
                 settings: Settings::Text {
                     is_sending_enter: false,
                     pasted_text: ":_pomuSmall9cm:".into(),
@@ -370,6 +373,7 @@ mod tests {
                 state: 0,
                 states: vec![State::default()],
                 settings: Settings::OpenChild { profile_uuid },
+                image: None,
             },
         );
 
@@ -466,7 +470,7 @@ mod tests {
             name: "small9cm".into(),
         };
 
-        let action = emote.to_action("pomu", true);
+        let action = emote.to_action("pomu", true, None);
 
         assert_eq!(action.states[0].title, "small9cm");
 
@@ -488,7 +492,7 @@ mod tests {
             name: "hic1".into(),
         };
 
-        let action = emote.to_action("", false);
+        let action = emote.to_action("", false, None);
 
         assert_eq!(action.states[0].title, "");
 
