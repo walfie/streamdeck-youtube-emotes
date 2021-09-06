@@ -7,10 +7,11 @@ pub fn parse_emotes(html: &str) -> Result<Vec<Emote>> {
 
     let start_index = html.find(START).wrap_err("failed to find ytInitialData")? + START.len();
     let (json_str, _) = html[start_index..]
-        .split_once(';')
+        .split_once(";</script>")
         .wrap_err("failed to find ending semicolon")?;
 
-    let json = serde_json::from_str::<Value>(json_str).wrap_err("failed to parse ytInitialData")?;
+    let json =
+        serde_json::from_str::<Value>(json_str).wrap_err("failed to parse ytInitialData JSON")?;
 
     let tabs = json
         .pointer("/contents/twoColumnBrowseResultsRenderer/tabs")

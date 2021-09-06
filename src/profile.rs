@@ -101,17 +101,14 @@ impl ProfilesWithImages {
 
         let mut manifests = Vec::new();
         let mut manifest_actions: Vec<Option<Action>> = Vec::new();
-        let mut page: usize = 0;
 
         for image in images.into_iter() {
             if manifest_actions.len() >= max_len {
-                let manifest_uuid = if page == 0 {
+                let manifest_uuid = if manifests.is_empty() {
                     root_profile_uuid
                 } else {
-                    uuid_v5(&name, page)
+                    uuid_v5(&name, manifests.len())
                 };
-
-                page += 1;
 
                 let mut manifest = ProfileManifest {
                     actions: HashMap::new(),
@@ -137,23 +134,25 @@ impl ProfilesWithImages {
             )));
         }
 
-        let mut manifest = ProfileManifest {
-            actions: HashMap::new(),
-            device_model: model.clone(),
-            device_uuid: device_uuid.clone(),
-            name: name.clone(),
-            version: "1.0".to_owned(),
-        };
+        if !manifest_actions.is_empty() {
+            let mut manifest = ProfileManifest {
+                actions: HashMap::new(),
+                device_model: model.clone(),
+                device_uuid: device_uuid.clone(),
+                name: name.clone(),
+                version: "1.0".to_owned(),
+            };
 
-        manifest.set_actions(std::mem::take(&mut manifest_actions));
+            manifest.set_actions(std::mem::take(&mut manifest_actions));
 
-        let manifest_uuid = if page == 0 {
-            root_profile_uuid
-        } else {
-            uuid_v5(&name, page)
-        };
+            let manifest_uuid = if manifests.is_empty() {
+                root_profile_uuid
+            } else {
+                uuid_v5(&name, manifests.len())
+            };
 
-        manifests.push((manifest_uuid, manifest));
+            manifests.push((manifest_uuid, manifest));
+        }
 
         for (_, manifest) in manifests.iter_mut().skip(1) {
             let action = Action {
@@ -189,9 +188,9 @@ impl ProfilesWithImages {
                 manifest
                     .actions
                     .insert(Position::new(0, height - 1), action);
-            } else {
-                child_uuid = Some(uuid.clone());
             }
+
+            child_uuid = Some(uuid.clone());
         }
 
         Ok(Self { manifests })
