@@ -1,5 +1,6 @@
-use anyhow::{bail, Context, Result};
 use bytes::Bytes;
+use color_eyre::eyre::bail;
+use color_eyre::eyre::{Result, WrapErr};
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
@@ -333,7 +334,6 @@ impl Default for State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
 
     #[test]
     fn serialize_profile() -> Result<()> {
@@ -476,7 +476,7 @@ mod tests {
 
         match action.settings {
             Settings::Text { pasted_text, .. } if pasted_text == ":_pomuSmall9cm:" => {}
-            _ => anyhow::bail!(
+            _ => bail!(
                 "Failed to find expected text in settings: {:?}",
                 action.settings
             ),
@@ -498,7 +498,7 @@ mod tests {
 
         match action.settings {
             Settings::Text { pasted_text, .. } if pasted_text == ":_hic1:" => {}
-            _ => anyhow::bail!(
+            _ => bail!(
                 "Failed to find expected text in settings: {:?}",
                 action.settings
             ),
