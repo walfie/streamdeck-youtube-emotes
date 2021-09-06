@@ -1,18 +1,27 @@
+use anyhow::{bail, Context, Result};
+use bytes::Bytes;
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Emote {
     pub name: String,
     pub url: String,
 }
 
+#[derive(Debug)]
+pub struct EmoteImage {
+    pub emote: Emote,
+    pub bytes: Bytes,
+}
+
 impl Emote {
     pub fn to_action(&self, prefix: &str, include_label: bool) -> Action {
-        let mut state = State::default();
+        let mut state = State::new_image();
 
+        // TODO: Make this always true
         if include_label {
             state.title = self.name.clone();
         }
@@ -36,6 +45,129 @@ impl Emote {
     }
 }
 
+pub struct ProfilesWithImages {
+    pub images_by_name: HashMap<String, Bytes>,
+    pub manifests: Vec<(Uuid, ProfileManifest)>,
+}
+
+impl ProfilesWithImages {
+    pub async fn new(
+        model: DeviceModel,
+        device_uuid: String,
+        name: String,
+        emotes: Vec<Emote>,
+        prefix: &str,
+        include_label: bool,
+    ) -> Result<Self> {
+        let image_futures = emotes.into_iter().map(|emote| async move {
+            let resp = reqwest::get(&emote.url)
+                .await
+                .with_context(|| format!("Failed to call URL {}", emote.url))?;
+
+            if !resp.status().is_success() {
+                bail!(
+                    "Received non-success code {} from URL {}",
+                    resp.status(),
+                    emote.url
+                );
+            }
+
+            Ok(EmoteImage {
+                emote,
+                bytes: resp.bytes().await?,
+            })
+        });
+
+        let images = futures::future::join_all(image_futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<EmoteImage>>>()
+            .context("failed to load images")?;
+
+        let (width, height) = model.size();
+        let max_len = (width * height) as usize;
+
+        let mut manifests = Vec::new();
+        let mut manifest_actions: Vec<Option<Action>> = Vec::new();
+
+        let mut images_by_name = HashMap::new();
+        for image in images.into_iter() {
+            if manifest_actions.len() >= max_len {
+                let mut manifest = ProfileManifest {
+                    actions: HashMap::new(),
+                    device_model: model.clone(),
+                    device_uuid: device_uuid.clone(),
+                    name: name.clone(),
+                    version: "1.0".to_owned(),
+                };
+
+                manifest.set_actions(std::mem::take(&mut manifest_actions));
+
+                manifests.push((Uuid::new_v4(), manifest));
+            }
+
+            if manifest_actions.len() % (width as usize) == 0 {
+                manifest_actions.push(None);
+            }
+
+            manifest_actions.push(Some(image.emote.to_action(prefix, include_label)));
+
+            images_by_name.insert(image.emote.name.clone(), image.bytes);
+        }
+
+        let mut manifest = ProfileManifest {
+            actions: HashMap::new(),
+            device_model: model.clone(),
+            device_uuid: device_uuid.clone(),
+            name: name.clone(),
+            version: "1.0".to_owned(),
+        };
+
+        manifest.set_actions(std::mem::take(&mut manifest_actions));
+
+        manifests.push((Uuid::new_v4(), manifest));
+
+        for (_, manifest) in manifests.iter_mut().skip(1) {
+            let action = Action {
+                name: "Open Folder".into(),
+                state: 0,
+                states: vec![State::default()],
+                settings: Settings::BackToParent {},
+            };
+
+            manifest.actions.insert(Position::new(0, 0), action);
+        }
+
+        let mut child_uuid: Option<Uuid> = None;
+        for (uuid, manifest) in manifests.iter_mut().rev() {
+            if let Some(child) = child_uuid {
+                let action = Action {
+                    name: "Create Folder".into(),
+                    state: 0,
+                    states: vec![State {
+                        title: "Next".into(),
+                        ..State::default()
+                    }],
+                    settings: Settings::OpenChild {
+                        profile_uuid: child.clone(),
+                    },
+                };
+
+                manifest
+                    .actions
+                    .insert(Position::new(0, height - 1), action);
+            } else {
+                child_uuid = Some(uuid.clone());
+            }
+        }
+
+        Ok(Self {
+            images_by_name,
+            manifests,
+        })
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ProfileManifest {
@@ -47,6 +179,7 @@ pub struct ProfileManifest {
     pub version: String, // `1.0`
 }
 
+#[derive(Clone)]
 pub enum DeviceModel {
     Standard,
     XL,
@@ -81,11 +214,11 @@ impl Serialize for DeviceModel {
 
 impl ProfileManifest {
     pub fn set_actions(&mut self, actions: Vec<Option<Action>>) {
-        let (width, height) = self.device_model.size();
+        let (width, _height) = self.device_model.size();
 
         for (index, action) in actions.into_iter().enumerate() {
             let index = index as u8;
-            let pos = Position::new(index % width, index / height);
+            let pos = Position::new(index % width, index / width);
 
             if let Some(action) = action {
                 self.actions.insert(pos, action);
@@ -96,7 +229,7 @@ impl ProfileManifest {
     }
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Debug)]
 pub struct Position {
     pub x: u8,
     pub y: u8,
@@ -171,6 +304,15 @@ pub struct State {
     pub title_show: String,
 }
 
+impl State {
+    fn new_image() -> Self {
+        Self {
+            image: "state0.png".into(),
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for State {
     fn default() -> Self {
         Self {
@@ -178,7 +320,7 @@ impl Default for State {
             f_size: "12".into(),
             f_style: "".into(),
             f_underline: "off".into(),
-            image: "state0.png".into(),
+            image: "".into(),
             title: "".into(),
             title_alignment: "bottom".into(),
             title_color: "#fbfcff".into(),
@@ -211,7 +353,7 @@ mod tests {
             Action {
                 name: "Text".into(),
                 state: 0,
-                states: vec![State::default()],
+                states: vec![State::new_image()],
                 settings: Settings::Text {
                     is_sending_enter: false,
                     pasted_text: ":_pomuSmall9cm:".into(),
@@ -251,7 +393,7 @@ mod tests {
                   "FSize": "12",
                   "FStyle": "",
                   "FUnderline": "off",
-                  "Image": "state0.png",
+                  "Image": "",
                   "Title": "",
                   "TitleAlignment": "bottom",
                   "TitleColor": "#fbfcff",
@@ -292,7 +434,7 @@ mod tests {
                   "FSize": "12",
                   "FStyle": "",
                   "FUnderline": "off",
-                  "Image": "state0.png",
+                  "Image": "",
                   "Title": "",
                   "TitleAlignment": "bottom",
                   "TitleColor": "#fbfcff",
