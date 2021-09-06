@@ -46,16 +46,33 @@ async fn main() -> Result<()> {
     };
 
     // Parse HTML file to get list of emotes
-    let html = if args.file.to_str() == Some("-") {
+    let html = if args.html_file.to_str() == Some("-") {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
         buf
     } else {
-        fs::read_to_string(&args.file)
-            .with_context(|| format!("Failed to read file {:?}", &args.file))?
+        fs::read_to_string(&args.html_file)
+            .with_context(|| format!("Failed to read file {:?}", &args.html_file))?
     };
 
-    let emotes = youtube::parse_emotes(&html)?;
+    // Reorder emotes, prioritizing ones specified in `prioritize`
+    let mut emotes = youtube::parse_emotes(&html)?;
+    let emotes_count = emotes.len();
+    emotes.sort_by_cached_key(|emote| {
+        if let Some(pos) = args.prioritize.iter().position(|name| name == &emote.name) {
+            return pos;
+        }
+
+        if let Some(pos) = args
+            .deprioritize
+            .iter()
+            .position(|name| name == &emote.name)
+        {
+            return pos + emotes_count + 1;
+        }
+
+        emotes_count
+    });
 
     // Generate profiles
     let profiles = ProfilesWithImages::new(
@@ -156,8 +173,8 @@ pub struct Args {
     /// https://www.youtube.com/channel/UCP4nMSTdwU1KqYWu3UH5DHQ/join
     ///
     /// Use - to read from stdin.
-    #[structopt(parse(from_os_str))]
-    pub file: PathBuf,
+    #[structopt(parse(from_os_str), long)]
+    pub html_file: PathBuf,
 
     /// The emote prefix (also known as "family name"). For example, if the channel has an emote
     /// `:_pomuSmall9cm:`, the emote prefix would be `pomu`.
@@ -191,6 +208,14 @@ pub struct Args {
     /// Stream Deck profile location (depending on platform).
     #[structopt(long)]
     pub out: Option<PathBuf>,
+
+    /// List of emotes that should appear first, before all others
+    #[structopt(long)]
+    pub prioritize: Vec<String>,
+
+    /// List of emotes that should appear last, after all others
+    #[structopt(long)]
+    pub deprioritize: Vec<String>,
 
     /// The Stream Deck model to generate the profile for
     #[structopt(long, possible_values = &["standard", "xl", "mini"])]
