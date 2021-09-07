@@ -243,9 +243,9 @@ fn merge_manifests_if_exists(new_manifest: &mut Value, existing_path: &PathBuf) 
 
 #[derive(StructOpt)]
 pub struct Args {
-    /// Path to an HTML file containing the "join" (memberships) page for a channel.
+    /// Path to an HTML file containing the memberships page for a channel.
     /// E.g., Download the following page in a browser while logged in:
-    /// https://www.youtube.com/channel/UCP4nMSTdwU1KqYWu3UH5DHQ/join
+    /// https://www.youtube.com/channel/UCP4nMSTdwU1KqYWu3UH5DHQ/memberships
     ///
     /// Use - to read from stdin.
     #[structopt(parse(from_os_str), long)]
