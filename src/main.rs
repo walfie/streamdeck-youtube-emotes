@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
     // Write profiles to filesystem
     let mut root_profiles_path = root_path.clone();
     let mut current_path = root_path;
-    let mut is_root = true;
+    let mut depth = 0;
 
     let copy_options = CopyOptions {
         overwrite: true,
@@ -109,9 +109,8 @@ async fn main() -> Result<()> {
     for (uuid, manifest) in profiles.manifests {
         let sd_profile_dir = format!("{}.sdProfile", uuid.to_string().to_uppercase());
 
-        if is_root {
+        if depth == 0 {
             root_profiles_path = current_path.join(&sd_profile_dir).join("Profiles");
-            is_root = false;
         } else {
             // Nested profiles have an additional `Profiles` directory
             current_path.push("Profiles");
@@ -123,8 +122,8 @@ async fn main() -> Result<()> {
         // After the initial profile installation, the Stream Deck application un-nests the
         // directories. The app seems to ignore changes that we make to the un-nested profiles, so
         // we have to move the directories back to the nested structure to make changes.
-        let src = root_profiles_path.join(&sd_profile_dir);
-        if src != current_path {
+        if depth >= 2 {
+            let src = root_profiles_path.join(&sd_profile_dir);
             if let Err(e) = fs_extra::dir::move_dir(&src, &current_path, &copy_options) {
                 if !matches!(e.kind, fs_extra::error::ErrorKind::NotFound) {
                     warn!(error = %e, "Failed to move existing nested profile");
@@ -163,6 +162,8 @@ async fn main() -> Result<()> {
                     .with_context(|| format!("Failed to write image {:?}", &img_file_path))?;
             }
         }
+
+        depth += 1;
     }
 
     if args.restart {
