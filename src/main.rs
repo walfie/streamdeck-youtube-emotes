@@ -3,10 +3,12 @@ mod youtube;
 
 use crate::profile::{DeviceModel, ProfilesWithImages};
 use color_eyre::eyre::{bail, Result, WrapErr};
+use fs_extra::dir::CopyOptions;
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
+use std::process::Command;
 use structopt::StructOpt;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -94,18 +96,43 @@ async fn main() -> Result<()> {
     .await?;
 
     // Write profiles to filesystem
+    let mut root_profiles_path = root_path.clone();
     let mut current_path = root_path;
     let mut is_root = true;
+
+    let copy_options = CopyOptions {
+        overwrite: true,
+        copy_inside: true,
+        ..Default::default()
+    };
+
     for (uuid, manifest) in profiles.manifests {
+        let sd_profile_dir = format!("{}.sdProfile", uuid.to_string().to_uppercase());
+
         if is_root {
+            root_profiles_path = current_path.join(&sd_profile_dir).join("Profiles");
             is_root = false;
         } else {
             // Nested profiles have an additional `Profiles` directory
             current_path.push("Profiles");
         }
 
-        current_path.push(format!("{}.sdProfile", uuid.to_string().to_uppercase()));
+        current_path.push(&sd_profile_dir);
         info!(path = ?current_path, "Creating profile directory");
+
+        // After the initial profile installation, the Stream Deck application un-nests the
+        // directories. The app seems to ignore changes that we make to the un-nested profiles, so
+        // we have to move the directories back to the nested structure to make changes.
+        let src = root_profiles_path.join(&sd_profile_dir);
+        if src != current_path {
+            if let Err(e) = fs_extra::dir::move_dir(&src, &current_path, &copy_options) {
+                if !matches!(e.kind, fs_extra::error::ErrorKind::NotFound) {
+                    warn!(error = %e, "Failed to move existing nested profile");
+                }
+            } else {
+                info!(?src, dest = ?current_path, "Moved existing nested profile");
+            }
+        }
 
         fs::create_dir_all(&current_path)
             .with_context(|| format!("Failed to create path {:?}", &current_path))?;
@@ -135,6 +162,42 @@ async fn main() -> Result<()> {
                 fs::write(&img_file_path, bytes)
                     .with_context(|| format!("Failed to write image {:?}", &img_file_path))?;
             }
+        }
+    }
+
+    if args.restart {
+        if !cfg!(target_os = "macos") && !cfg!(target_os = "windows") {
+            warn!("Ignoring restart flag, since the OS is not Windows or macOS");
+            return Ok(());
+        }
+
+        info!("Restarting Stream Deck application");
+
+        let stop_result = if cfg!(target_os = "macos") {
+            Command::new("pkill").arg("Stream Deck").status()
+        } else {
+            // Not sure if this actually works, I don't have a Windows device to test on
+            Command::new("taskkill")
+                .args(&["/im", "/f", "StreamDeck.exe"])
+                .status()
+        };
+
+        if let Err(e) = stop_result {
+            warn!(error = %e, "Failed to stop Stream Deck");
+        }
+
+        let start_result = if cfg!(target_os = "macos") {
+            Command::new("open")
+                .arg("/Applications/Stream Deck.app")
+                .status()
+        } else {
+            Command::new("start")
+                .args(&["", r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#])
+                .status()
+        };
+
+        if let Err(e) = start_result {
+            warn!(error = %e, "Failed to start Stream Deck");
         }
     }
 
@@ -229,4 +292,8 @@ pub struct Args {
     /// The Stream Deck model to generate the profile for
     #[structopt(long, possible_values = &["standard", "xl", "mini"])]
     pub model: DeviceModel,
+
+    /// Restart the Stream Deck application after creating the profile
+    #[structopt(long)]
+    pub restart: bool,
 }
