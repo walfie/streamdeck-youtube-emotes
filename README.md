@@ -56,6 +56,17 @@ profile.
 
 ### Screenshots
 
+Here is an example of a profile with two pages of emotes, generated with the
+command above, using [Pomu Rainpuff's membership page][Pomu] as input.
+
+* Page 1
+
+  ![Profile page 1](./docs/profile-page1.png)
+
+* Page 2
+
+  ![Profile page 2](./docs/profile-page2.png)
+
 The generated profile will have one column of reserved space on the left, which
 will be occupied by the next/previous buttons (in cases where the channel has
 more emotes than can fit on a single page).
@@ -64,13 +75,7 @@ Other empty spaces can be filled via the Stream Deck UI, so you can have custom
 keys for switching profiles, etc. These empty spaces will not be overwritten
 when generating the profile again (unless the `--no-merge` flag is set)
 
-Here is an example of a profile with two pages of emotes, generated with the
-command above.
-
-* Page 1
-    * ![Profile page 1](./docs/profile-page1.png)
-* Page 2
-    * ![Profile page 2](./docs/profile-page2.png)
+[Pomu]: https://www.youtube.com/channel/UCP4nMSTdwU1KqYWu3UH5DHQ/membership
 
 ## Usage
 
