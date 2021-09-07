@@ -1,0 +1,113 @@
+# Based on:
+# https://eugene-babichenko.github.io/blog/2020/05/09/github-actions-cross-platform-auto-releases/
+# https://dev.to/eugenebabichenko/automated-multi-platform-releases-with-github-actions-1abg
+# https://github.com/BurntSushi/ripgrep/blob/9b01a8f9ae53ebcd05c27ec21843758c2c1e823f/.github/workflows/release.yml
+
+name: Upload Release Assets
+on:
+  push:
+    tags:
+    - 'v[0-9]+\.[0-9]+\.[0-9]+'
+
+jobs:
+  create_release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_version: ${{ env.RELEASE_VERSION }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # Fetch all history
+
+    - name: Get the release version from the tag
+      shell: bash
+      if: env.RELEASE_VERSION == ''
+      run: |
+        echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        echo "Release version: $RELEASE_VERSION"
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        PREVIOUS_TAG=$(git describe --tags --always --abbrev=0 HEAD^)
+        echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+        git log --reverse \
+          --invert-grep --grep="(cargo-release) " \
+          --pretty=tformat:'* %h %s' \
+          $PREVIOUS_TAG..HEAD >> $GITHUB_ENV
+        echo -e "\nEOF" >> $GITHUB_ENV
+
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.RELEASE_VERSION }}
+        release_name: ${{ env.RELEASE_VERSION }}
+        body: ${{ env.CHANGELOG }}
+        draft: false
+        prerelease: false
+
+  release_assets:
+    name: Release assets
+    needs: create_release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+        - os: ubuntu-latest
+          target: x86_64-unknown-linux-gnu
+        - os: macos-latest
+          target: x86_64-apple-darwin
+        - os: windows-latest
+          target: x86_64-pc-windows-msvc
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: 1.54.0
+        target: ${{ matrix.target }}
+        override: true
+    - uses: Swatinem/rust-cache@v1.2.0
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --all --target ${{ matrix.target }}
+
+    - name: Build archive
+      shell: bash
+      run: |
+        EXECUTABLE_PATH="$(find target/${{ matrix.target}}/release -maxdepth 1 -type f -perm -u+x | head -n 1)"
+        BINARY_NAME="$(basename $EXECUTABLE_PATH .exe)"
+        STAGING="$BINARY_NAME-${{ needs.create_release.outputs.release_version }}-${{ matrix.target }}"
+
+        mkdir -p "$STAGING"
+        cp "$EXECUTABLE_PATH" "$STAGING/"
+
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          7z a "$STAGING.zip" "$STAGING"
+          echo "ASSET=$STAGING.zip" >> $GITHUB_ENV
+        else
+          tar czf "$STAGING.tar.gz" "$STAGING"
+          echo "ASSET=$STAGING.tar.gz" >> $GITHUB_ENV
+        fi
+
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_name: ${{ env.ASSET }}
+        asset_path: ${{ env.ASSET }}
+        asset_content_type: application/octet-stream
+
