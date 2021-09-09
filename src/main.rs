@@ -212,35 +212,25 @@ fn merge_manifests_if_exists(new_manifest: &mut Value, existing_path: &PathBuf) 
 }
 
 fn restart_stream_deck() -> Result<()> {
-    if !cfg!(target_os = "macos") && !cfg!(target_os = "windows") {
-        warn!("Ignoring restart flag, since the OS is not Windows or macOS");
+    if !cfg!(target_os = "macos") {
+        warn!(
+            "The --restart flag is currently only supported on macOS. \
+            See https://github.com/walfie/streamdeck-youtube-emotes/issues/1"
+        );
         return Ok(());
     }
 
     info!("Restarting Stream Deck application");
 
-    let stop_result = if cfg!(target_os = "macos") {
-        Command::new("pkill").arg("Stream Deck").status()
-    } else {
-        Command::new("taskkill")
-            .args(&["/f", "/im", "StreamDeck.exe"])
-            .status()
-    };
+    let stop_result = Command::new("pkill").arg("Stream Deck").status();
 
     if let Err(e) = stop_result {
         warn!(error = %e, "Failed to stop Stream Deck");
     }
 
-    let start_result = if cfg!(target_os = "macos") {
-        Command::new("open")
-            .arg("/Applications/Stream Deck.app")
-            .status()
-    } else {
-        // Wait a bit to ensure that the Stream Deck application has actually closed
-        std::thread::sleep(Duration::from_secs(2));
-
-        Command::new(r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#).status()
-    };
+    let start_result = Command::new("open")
+        .arg("/Applications/Stream Deck.app")
+        .status();
 
     if let Err(e) = start_result {
         warn!(error = %e, "Failed to start Stream Deck");
