@@ -238,9 +238,7 @@ fn restart_stream_deck() -> Result<()> {
         // Wait a bit to ensure that the Stream Deck application has actually closed
         std::thread::sleep(Duration::from_secs(2));
 
-        Command::new("start")
-            .args(&["", r#""C:\Program Files\Elgato\StreamDeck\StreamDeck.exe""#])
-            .status()
+        Command::new(r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#).status()
     };
 
     if let Err(e) = start_result {
