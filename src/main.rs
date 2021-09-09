@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
                 .join("ProfilesV2")
                 .to_path_buf()
         } else if cfg!(target_os = "windows") {
-            home.join("%AppData%")
+            home.join("AppData")
                 .join("Roaming")
                 .join("StreamDeck")
                 .join("ProfilesV2")
@@ -179,7 +179,7 @@ async fn main() -> Result<()> {
         } else {
             // Not sure if this actually works, I don't have a Windows device to test on
             Command::new("taskkill")
-                .args(&["/im", "/f", "StreamDeck.exe"])
+                .args(&["/f", "/im", "StreamDeck.exe"])
                 .status()
         };
 
