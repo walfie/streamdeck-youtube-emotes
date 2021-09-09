@@ -9,6 +9,7 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 use structopt::StructOpt;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -192,8 +193,12 @@ async fn main() -> Result<()> {
                 .arg("/Applications/Stream Deck.app")
                 .status()
         } else {
-            // Not sure if this actually works either
-            Command::new(r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#).status()
+            // Wait a bit to ensure that the Stream Deck application has actually closed
+            std::thread::sleep(Duration::from_secs(2));
+
+            Command::new("start")
+                .args(&["", r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#])
+                .status()
         };
 
         if let Err(e) = start_result {
