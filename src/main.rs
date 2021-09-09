@@ -38,6 +38,7 @@ async fn main() -> Result<()> {
         } else if cfg!(target_os = "windows") {
             home.join("AppData")
                 .join("Roaming")
+                .join("Elgato")
                 .join("StreamDeck")
                 .join("ProfilesV2")
                 .to_path_buf()
