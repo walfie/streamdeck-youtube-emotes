@@ -2,8 +2,6 @@
 
 CLI tool to generate Stream Deck profiles for YouTube membership emotes.
 
-Disclaimer: This has not been tested on Windows. Contributions are welcome!
-
 ## Download
 
 Visit the [releases page](https://github.com/walfie/streamdeck-youtube-emotes/releases)
@@ -87,8 +85,6 @@ when generating the profile again (unless the `--no-merge` flag is set)
 The full list of options can be found below:
 
 ```
-streamdeck-youtube-emotes 0.1.0
-
 USAGE:
     streamdeck-youtube-emotes [FLAGS] [OPTIONS] --html-file <html-file> --model <model> --name <name>
 
@@ -132,11 +128,13 @@ OPTIONS:
             profile location (depending on platform)
         --prefix <prefix>
             The emote prefix (also known as "family name"). For example, if the channel has an emote `:_pomuSmall9cm:`,
-            the emote prefix would be `pomu` [default: ]
+            the emote prefix would be `pomu`. For some channels, there is no prefix, so this option can be omitted
+            [default: ]
         --prioritize <prioritize>...
             List of emotes that should appear first, before all others (case-insensitive)
 
         --profile-uuid <profile-uuid>
             Override the UUID for the profile
+
 ```
 

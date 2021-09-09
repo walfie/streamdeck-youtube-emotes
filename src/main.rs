@@ -168,42 +168,7 @@ async fn main() -> Result<()> {
     }
 
     if args.restart {
-        if !cfg!(target_os = "macos") && !cfg!(target_os = "windows") {
-            warn!("Ignoring restart flag, since the OS is not Windows or macOS");
-            return Ok(());
-        }
-
-        info!("Restarting Stream Deck application");
-
-        let stop_result = if cfg!(target_os = "macos") {
-            Command::new("pkill").arg("Stream Deck").status()
-        } else {
-            // Not sure if this actually works, I don't have a Windows device to test on
-            Command::new("taskkill")
-                .args(&["/f", "/im", "StreamDeck.exe"])
-                .status()
-        };
-
-        if let Err(e) = stop_result {
-            warn!(error = %e, "Failed to stop Stream Deck");
-        }
-
-        let start_result = if cfg!(target_os = "macos") {
-            Command::new("open")
-                .arg("/Applications/Stream Deck.app")
-                .status()
-        } else {
-            // Wait a bit to ensure that the Stream Deck application has actually closed
-            std::thread::sleep(Duration::from_secs(2));
-
-            Command::new("start")
-                .args(&["", r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#])
-                .status()
-        };
-
-        if let Err(e) = start_result {
-            warn!(error = %e, "Failed to start Stream Deck");
-        }
+        restart_stream_deck().context("Failed to restart Stream Deck application")?;
     }
 
     Ok(())
@@ -245,6 +210,46 @@ fn merge_manifests_if_exists(new_manifest: &mut Value, existing_path: &PathBuf) 
     Ok(())
 }
 
+fn restart_stream_deck() -> Result<()> {
+    if !cfg!(target_os = "macos") && !cfg!(target_os = "windows") {
+        warn!("Ignoring restart flag, since the OS is not Windows or macOS");
+        return Ok(());
+    }
+
+    info!("Restarting Stream Deck application");
+
+    let stop_result = if cfg!(target_os = "macos") {
+        Command::new("pkill").arg("Stream Deck").status()
+    } else {
+        Command::new("taskkill")
+            .args(&["/f", "/im", "StreamDeck.exe"])
+            .status()
+    };
+
+    if let Err(e) = stop_result {
+        warn!(error = %e, "Failed to stop Stream Deck");
+    }
+
+    let start_result = if cfg!(target_os = "macos") {
+        Command::new("open")
+            .arg("/Applications/Stream Deck.app")
+            .status()
+    } else {
+        // Wait a bit to ensure that the Stream Deck application has actually closed
+        std::thread::sleep(Duration::from_secs(2));
+
+        Command::new("start")
+            .args(&["", r#""C:\Program Files\Elgato\StreamDeck\StreamDeck.exe""#])
+            .status()
+    };
+
+    if let Err(e) = start_result {
+        warn!(error = %e, "Failed to start Stream Deck");
+    }
+
+    Ok(())
+}
+
 #[derive(StructOpt)]
 pub struct Args {
     /// Path to an HTML file containing the memberships page for a channel.
@@ -256,7 +261,8 @@ pub struct Args {
     pub html_file: PathBuf,
 
     /// The emote prefix (also known as "family name"). For example, if the channel has an emote
-    /// `:_pomuSmall9cm:`, the emote prefix would be `pomu`.
+    /// `:_pomuSmall9cm:`, the emote prefix would be `pomu`. For some channels, there is no prefix,
+    /// so this option can be omitted.
     #[structopt(default_value = "", long)]
     pub prefix: String,
 
