@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
                 .join("com.elgato.StreamDeck")
                 .join("ProfilesV2")
                 .to_path_buf()
-        } else if !cfg!(target_os = "windows") {
+        } else if cfg!(target_os = "windows") {
             home.join("%AppData%")
                 .join("Roaming")
                 .join("StreamDeck")
@@ -192,9 +192,8 @@ async fn main() -> Result<()> {
                 .arg("/Applications/Stream Deck.app")
                 .status()
         } else {
-            Command::new("start")
-                .args(&["", r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#])
-                .status()
+            // Not sure if this actually works either
+            Command::new(r#"C:\Program Files\Elgato\StreamDeck\StreamDeck.exe"#).status()
         };
 
         if let Err(e) = start_result {

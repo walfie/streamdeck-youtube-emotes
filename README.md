@@ -4,6 +4,11 @@ CLI tool to generate Stream Deck profiles for YouTube membership emotes.
 
 Disclaimer: This has not been tested on Windows. Contributions are welcome!
 
+## Download
+
+Visit the [releases page](https://github.com/walfie/streamdeck-youtube-emotes/releases)
+to find the latest release for your platform.
+
 ## Build
 
 The following command creates an executable at `./target/release/streamdeck-youtube-emotes`
