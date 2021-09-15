@@ -9,7 +9,6 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Duration;
 use structopt::StructOpt;
 use tracing::{info, warn};
 use uuid::Uuid;

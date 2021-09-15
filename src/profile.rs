@@ -240,7 +240,7 @@ impl DeviceModel {
     pub fn size(&self) -> (u8, u8) {
         match self {
             Self::Standard => (5, 3),
-            Self::XL => (4, 8),
+            Self::XL => (8, 4),
             Self::Mini => (3, 2),
         }
     }
