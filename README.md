@@ -23,7 +23,9 @@ defined in the HTML of a channel's membership page. E.g.,
 <https://www.youtube.com/channel/UCP4nMSTdwU1KqYWu3UH5DHQ/membership>
 
 Unfortunately the emote data is only available when you're logged in, so the
-download must be done through your browser.
+download must be done through your browser. If you download the file in Chrome,
+make sure to select "Webpage, HTML Only" as the format when saving (to avoid
+any additional postprocessing of the HTML file).
 
 Assuming you've saved the HTML to a file `/tmp/pomu.html` and have a standard
 15-key Stream Deck, you can run the following:
