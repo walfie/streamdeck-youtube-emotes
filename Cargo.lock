@@ -1092,7 +1092,7 @@ dependencies = [
 
 [[package]]
 name = "streamdeck-youtube-emotes"
-version = "0.1.7"
+version = "0.1.8-alpha.0"
 dependencies = [
  "bytes",
  "color-eyre",
