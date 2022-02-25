@@ -1,5 +1,5 @@
 use crate::profile::Emote;
-use color_eyre::eyre::{ContextCompat, Result, WrapErr};
+use color_eyre::eyre::{bail, ContextCompat, Result, WrapErr};
 use serde_json::Value;
 
 pub fn parse_emotes(html: &str) -> Result<Vec<Emote>> {
@@ -19,31 +19,26 @@ pub fn parse_emotes(html: &str) -> Result<Vec<Emote>> {
         .as_array()
         .wrap_err("failed to parse tabs as array")?;
 
-    let content = tabs
+    let emotes = tabs
         .iter()
-        .find_map(|value| match value.pointer("/tabRenderer/title") {
-            Some(Value::String(s)) if s == "Membership" => value.pointer(concat!(
-                "/tabRenderer/content/sectionListRenderer",
-                "/contents/0/sponsorshipsManagementRenderer/content"
-            )),
-            _ => None,
+        .flat_map(|value| {
+            value
+                .pointer("/tabRenderer/content/sectionListRenderer/contents")
+                .into_iter()
+                .flat_map(|value| value.as_array().into_iter().flatten())
         })
-        .wrap_err("failed to find content")?
-        .as_array()
-        .wrap_err("failed to parse content as array")?
-        .iter()
-        .find_map(|content| {
-            content.pointer(concat!(
-                "/sponsorshipsExpandableMessageRenderer",
-                "/expandableItems/0",
-                "/sponsorshipsPerksRenderer/perks/0",
-                "/sponsorshipsPerkRenderer/images"
-            ))
+        .flat_map(|value| {
+            value
+                .pointer("/sponsorshipsExpandablePerksRenderer/expandableItems")
+                .into_iter()
+                .flat_map(|value| value.as_array().into_iter().flatten())
         })
-        .wrap_err("failed to find images")?
-        .as_array()
-        .wrap_err("failed to parse images as array")?
-        .iter()
+        .flat_map(|value| {
+            value
+                .pointer("/sponsorshipsPerkRenderer/images")
+                .into_iter()
+                .flat_map(|value| value.as_array().into_iter().flatten())
+        })
         .map(|value| {
             let name = value
                 .pointer("/accessibility/accessibilityData/label")
@@ -68,5 +63,9 @@ pub fn parse_emotes(html: &str) -> Result<Vec<Emote>> {
         })
         .collect::<Result<Vec<Emote>>>()?;
 
-    Ok(content)
+    if emotes.is_empty() {
+        bail!("failed to find emotes in JSON")
+    } else {
+        Ok(emotes)
+    }
 }
