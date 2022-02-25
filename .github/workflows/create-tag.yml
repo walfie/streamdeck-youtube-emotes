@@ -31,5 +31,5 @@ jobs:
     - name: Run cargo-release
       run: |
         curl -L https://github.com/crate-ci/cargo-release/releases/download/v0.17.1/cargo-release-v0.17.1-x86_64-unknown-linux-gnu.tar.gz | tar xvz --strip-components=1
-        ./cargo-release --no-confirm --execute --no-verify
+        ./cargo-release release --no-confirm --execute --no-verify
 
