@@ -30,6 +30,8 @@ jobs:
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
     - name: Run cargo-release
       run: |
+        cd /tmp
         curl -L https://github.com/crate-ci/cargo-release/releases/download/v0.17.1/cargo-release-v0.17.1-x86_64-unknown-linux-gnu.tar.gz | tar xvz --strip-components=1
-        ./cargo-release release --no-confirm --execute --no-verify
+        cd -
+        /tmp/cargo-release release --no-confirm --execute --no-verify
 
